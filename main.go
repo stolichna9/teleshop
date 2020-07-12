@@ -28,6 +28,7 @@ func main() {
 	log.Println("Connected to MongoDB!")
 	customerCollection := client.Database("teleshop").Collection("customer")
 	positionCollection := client.Database("teleshop").Collection("position")
+	orderCollection := client.Database("teleshop").Collection("order")
 
 	b, _ := tb.NewBot(tb.Settings{
 		Token:  "",
@@ -45,6 +46,7 @@ func main() {
 		btnDesert          = menu.Text("🍰 Desert 🍰")
 		btnAddPhiladelphia = menu.Text("Add to my bag")
 		btnClear           = menu.Text("Clear")
+		btnPlaceAnOrder    = menu.Text("Place an order")
 		btnMainMenu        = menu.Text("↩ Main Menu ↩")
 	)
 
@@ -139,11 +141,36 @@ func main() {
 			}
 			reply += "Total price: " + strconv.Itoa(totalPrice)
 			menu.Reply(
-				menu.Row(btnClear),
+				menu.Row(btnClear, btnPlaceAnOrder),
 				menu.Row(btnMainMenu),
 			)
 		}
 		b.Send(m.Sender, reply, menu)
+	})
+
+	b.Handle(&btnPlaceAnOrder, func(m *tb.Message) {
+		var customer Customer
+		filter := bson.D{{"username", m.Sender.Username}, {"telegramID", m.Sender.ID}}
+		_ = customerCollection.FindOne(context.TODO(), filter).Decode(&customer)
+
+		// Create an order
+		_, _ = orderCollection.InsertOne(context.TODO(), bson.D{
+			{"date", time.Now()},
+			{"customer", customer.ID},
+			{"bag", customer.Bag},
+		})
+
+		// Clear the customer's bag
+		filterCustomer := bson.D{{"_id", customer.ID}}
+		updateCustomerBag := bson.D{
+			{"$set", bson.D{{"bag", []primitive.ObjectID{}}}},
+		}
+		_, _ = customerCollection.UpdateOne(context.TODO(), filterCustomer, updateCustomerBag)
+
+		menu.Reply(
+			menu.Row(btnMainMenu),
+		)
+		b.Send(m.Sender, "Your order is placed!", menu)
 	})
 
 	b.Handle(&btnClear, func(m *tb.Message) {

@@ -19,3 +19,9 @@ type Position struct {
 	Currency string             `bson:"currency, omitempty"`
 	Src      string             `bson:"src, omitempty"`
 }
+
+type Order struct {
+	ID   primitive.ObjectID   `bson:"_id,omitempty"`
+	Bag  []primitive.ObjectID `bson:"bag, omitempty"`
+	Date primitive.DateTime
+}
