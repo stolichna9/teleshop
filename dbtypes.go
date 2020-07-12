@@ -16,4 +16,6 @@ type Position struct {
 	Name     string             `bson:"name, omitempty"`
 	Category string             `bson:"category, omitempty"`
 	Price    int                `bson:"price, omitempty"`
+	Currency string             `bson:"currency, omitempty"`
+	Src      string             `bson:"src, omitempty"`
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -61,14 +62,14 @@ func main() {
 		menu.Reply(
 			menu.Row(btnMenu, btnBag),
 		)
-		b.Send(m.Sender, "Welcome to the teleshop: ", menu)
+		b.Send(m.Sender, "Welcome to the teleshop:", menu)
 	})
 
 	b.Handle(&btnMainMenu, func(m *tb.Message) {
 		menu.Reply(
 			menu.Row(btnMenu, btnBag),
 		)
-		b.Send(m.Sender, "Welcome to the teleshop: ", menu)
+		b.Send(m.Sender, "Welcome to the teleshop:", menu)
 	})
 
 	b.Handle(&btnMenu, func(m *tb.Message) {
@@ -76,7 +77,7 @@ func main() {
 			menu.Row(btnSushi, btnPizza, btnDesert),
 			menu.Row(btnMainMenu),
 		)
-		b.Send(m.Sender, "Choose a category of food you wanna buy: ", menu)
+		b.Send(m.Sender, "Choose a category of food you wanna buy:", menu)
 	})
 
 	b.Handle(&btnSushi, func(m *tb.Message) {
@@ -84,11 +85,14 @@ func main() {
 			menu.Row(btnPhiladelphia, btnUnagiPhila),
 			menu.Row(btnMainMenu),
 		)
-		b.Send(m.Sender, "Now choose a food you like: ", menu)
+		b.Send(m.Sender, "Now choose a food you like:", menu)
 	})
 
 	b.Handle(&btnPhiladelphia, func(m *tb.Message) {
-		p := &tb.Photo{File: tb.FromURL("https://www.google.ru/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png")}
+		var position Position
+		filterPosition := bson.D{{"name", "Philadelphia"}, {"category", "🍣 Sushi 🍣"}}
+		_ = positionCollection.FindOne(context.TODO(), filterPosition).Decode(&position)
+		p := &tb.Photo{File: tb.FromURL(position.Src)}
 		menu.Reply(
 			menu.Row(btnAddPhiladelphia),
 			menu.Row(btnMainMenu),
@@ -115,20 +119,31 @@ func main() {
 
 	b.Handle(&btnBag, func(m *tb.Message) {
 		var customer Customer
-		var position Position
+		var reply string
 		filterCustomer := bson.D{{"username", m.Sender.Username}, {"telegramID", m.Sender.ID}}
 		_ = customerCollection.FindOne(context.TODO(), filterCustomer).Decode(&customer)
-		for _, positionID := range customer.Bag {
-			filterPosition := bson.D{{"_id", positionID}}
-			_ = positionCollection.FindOne(context.TODO(), filterPosition).Decode(&position)
-			println(position.Name)
+		if len(customer.Bag) <= 0 {
+			reply = "Your bag is empty!"
+			menu.Reply(
+				menu.Row(btnMainMenu),
+			)
+		} else {
+			var position Position
+			reply = "Positions in your bag:\n"
+			totalPrice := 0
+			for _, positionID := range customer.Bag {
+				filterPosition := bson.D{{"_id", positionID}}
+				_ = positionCollection.FindOne(context.TODO(), filterPosition).Decode(&position)
+				reply += position.Name + ": " + strconv.Itoa(position.Price) + " " + position.Currency + "\n"
+				totalPrice += position.Price
+			}
+			reply += "Total price: " + strconv.Itoa(totalPrice)
+			menu.Reply(
+				menu.Row(btnClear),
+				menu.Row(btnMainMenu),
+			)
 		}
-
-		menu.Reply(
-			menu.Row(btnClear),
-			menu.Row(btnMainMenu),
-		)
-		b.Send(m.Sender, "Your bag: ", menu)
+		b.Send(m.Sender, reply, menu)
 	})
 
 	b.Handle(&btnClear, func(m *tb.Message) {
